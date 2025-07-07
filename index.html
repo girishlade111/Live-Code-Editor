@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Code Editor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles for the editor */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .code-editor {
+            font-family: 'Fira Code', monospace;
+            background-color: #1e293b; /* slate-800 */
+            color: #e2e8f0; /* slate-200 */
+            border: none;
+            outline: none;
+            resize: none;
+        }
+        /* Custom scrollbar for webkit browsers */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b; /* slate-800 */
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569; /* slate-600 */
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b; /* slate-500 */
+        }
+        /* Simple resizer handle style */
+        .resizer {
+            background: #334155; /* slate-700 */
+            cursor: col-resize;
+            width: 8px;
+            flex-shrink: 0;
+            transition: background 0.2s ease;
+        }
+        .resizer:hover {
+            background: #4f46e5; /* indigo-600 */
+        }
+        /* Hide textareas that are not active */
+        .editor-pane.hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-white h-screen flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-slate-800 border-b border-slate-700 p-3 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-3">
+            <svg class="w-8 h-8 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" />
+            </svg>
+            <h1 class="text-xl font-semibold text-slate-200">Live Code Editor</h1>
+        </div>
+        <span class="text-sm text-slate-400">Instant Preview</span>
+    </header>
+
+    <!-- Main Content: Editor + Preview -->
+    <main id="main-container" class="flex flex-grow w-full h-full overflow-hidden">
+
+        <!-- Left Side: Code Editor -->
+        <div id="editor-container" class="flex flex-col h-full" style="width: 50%;">
+            <!-- Tabs -->
+            <div class="bg-slate-800 flex-shrink-0">
+                <nav id="tabs" class="flex space-x-1 p-1">
+                    <button data-lang="html" class="tab-btn active-tab px-4 py-2 text-sm font-medium rounded-md focus:outline-none">HTML</button>
+                    <button data-lang="css" class="tab-btn inactive-tab px-4 py-2 text-sm font-medium rounded-md focus:outline-none">CSS</button>
+                    <button data-lang="js" class="tab-btn inactive-tab px-4 py-2 text-sm font-medium rounded-md focus:outline-none">JavaScript</button>
+                </nav>
+            </div>
+
+            <!-- Editor Panes -->
+            <div class="flex-grow relative">
+                <textarea id="html-editor" class="editor-pane code-editor w-full h-full p-4 text-sm" spellcheck="false" data-lang="html">
+<!-- Write your HTML here -->
+<div class="container">
+  <h1>Hello, World!</h1>
+  <p>This is a live code editor.</p>
+  <button onclick="changeText()">Click Me</button>
+</div>
+                </textarea>
+                <textarea id="css-editor" class="editor-pane code-editor w-full h-full p-4 text-sm hidden" spellcheck="false" data-lang="css">
+/* Write your CSS here */
+body {
+  font-family: sans-serif;
+  background: linear-gradient(45deg, #222, #444);
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  margin: 0;
+  text-align: center;
+}
+.container {
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+h1 {
+  color: #00bcd4;
+}
+button {
+  background-color: #00bcd4;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.3s;
+}
+button:hover {
+  background-color: #0097a7;
+}
+                </textarea>
+                <textarea id="js-editor" class="editor-pane code-editor w-full h-full p-4 text-sm hidden" spellcheck="false" data-lang="js">
+// Write your JavaScript here
+function changeText() {
+  const p = document.querySelector('p');
+  p.textContent = "You clicked the button! The JavaScript is working.";
+}
+                </textarea>
+            </div>
+        </div>
+
+        <!-- Resizer Handle -->
+        <div id="resizer" class="resizer"></div>
+
+        <!-- Right Side: Live Preview -->
+        <div id="preview-container" class="flex-grow h-full bg-white">
+            <iframe id="preview-frame" class="w-full h-full border-0" title="Live Preview"></iframe>
+        </div>
+    </main>
+
+    <script>
+        // --- DOM Element References ---
+        const htmlEditor = document.getElementById('html-editor');
+        const cssEditor = document.getElementById('css-editor');
+        const jsEditor = document.getElementById('js-editor');
+        const previewFrame = document.getElementById('preview-frame');
+        const tabsContainer = document.getElementById('tabs');
+        const editorPanes = document.querySelectorAll('.editor-pane');
+
+        // --- Core Functionality: Update Preview ---
+        
+        /**
+         * Compiles the code from the editors and updates the iframe preview.
+         */
+        function updatePreview() {
+            const htmlCode = htmlEditor.value;
+            const cssCode = cssEditor.value;
+            const jsCode = jsEditor.value;
+
+            // Construct the full HTML document for the iframe
+            const documentContent = `
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                        ${cssCode}
+                    </style>
+                </head>
+                <body>
+                    ${htmlCode}
+                    <script>
+                        // Basic error handling for the preview frame
+                        window.addEventListener('error', function(e) {
+                            console.error('Error in preview script:', e.message);
+                            const body = document.querySelector('body');
+                            if (body) {
+                                const errorBox = document.createElement('div');
+                                errorBox.style.position = 'fixed';
+                                errorBox.style.bottom = '10px';
+                                errorBox.style.left = '10px';
+                                errorBox.style.padding = '10px';
+                                errorBox.style.background = '#ff4d4d';
+                                errorBox.style.color = 'white';
+                                errorBox.style.borderRadius = '5px';
+                                errorBox.style.fontFamily = 'monospace';
+                                errorBox.textContent = 'JavaScript Error: ' + e.message;
+                                body.appendChild(errorBox);
+                            }
+                        });
+                        ${jsCode}
+                    <\/script>
+                </body>
+                </html>
+            `;
+
+            // Use srcdoc to securely inject the content into the iframe
+            previewFrame.srcdoc = documentContent;
+        }
+
+        // --- Event Listeners ---
+
+        // Update preview on any code change (using 'input' for real-time feedback)
+        [htmlEditor, cssEditor, jsEditor].forEach(editor => {
+            editor.addEventListener('input', updatePreview);
+        });
+
+        // --- Tab Switching Logic ---
+        tabsContainer.addEventListener('click', (e) => {
+            if (!e.target.matches('.tab-btn')) return;
+
+            const targetLang = e.target.dataset.lang;
+
+            // Update tab button styles
+            tabsContainer.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active-tab');
+                btn.classList.add('inactive-tab');
+            });
+            e.target.classList.add('active-tab');
+            e.target.classList.remove('inactive-tab');
+
+            // Show the correct editor pane
+            editorPanes.forEach(pane => {
+                if (pane.dataset.lang === targetLang) {
+                    pane.classList.remove('hidden');
+                } else {
+                    pane.classList.add('hidden');
+                }
+            });
+        });
+        
+        // --- Resizable Panes Logic ---
+        const resizer = document.getElementById('resizer');
+        const editorContainer = document.getElementById('editor-container');
+        
+        let isResizing = false;
+
+        resizer.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            isResizing = true;
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', stopResizing);
+        });
+
+        function handleMouseMove(e) {
+            if (!isResizing) return;
+            const container = document.getElementById('main-container');
+            const containerRect = container.getBoundingClientRect();
+            let newEditorWidth = e.clientX - containerRect.left;
+
+            // Constrain resizing
+            if (newEditorWidth < 200) newEditorWidth = 200; // Minimum width
+            if (newEditorWidth > container.clientWidth - 200) newEditorWidth = container.clientWidth - 200; // Maximum width
+
+            editorContainer.style.width = `${newEditorWidth}px`;
+        }
+
+        function stopResizing() {
+            isResizing = false;
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', stopResizing);
+        }
+
+        // --- Initial Load ---
+        
+        /**
+         * Sets the initial state of the UI on page load.
+         */
+        function initialize() {
+            // Apply styles for active/inactive tabs
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                if(btn.classList.contains('active-tab')) {
+                    btn.classList.add('bg-indigo-600', 'text-white');
+                    btn.classList.remove('text-slate-300', 'hover:bg-slate-700');
+                } else {
+                    btn.classList.add('text-slate-300', 'hover:bg-slate-700');
+                    btn.classList.remove('bg-indigo-600', 'text-white');
+                }
+            });
+        }
+        
+        // Add tab style change logic to the tab click listener
+        tabsContainer.addEventListener('click', (e) => {
+             if (!e.target.matches('.tab-btn')) return;
+             initialize(); // Re-apply styles on click
+        });
+
+        // Initial render on page load
+        window.addEventListener('load', () => {
+            initialize();
+            updatePreview();
+        });
+
+    </script>
+</body>
+</html>
